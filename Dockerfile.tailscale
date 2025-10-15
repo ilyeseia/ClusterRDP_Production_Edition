@@ -1,0 +1,21 @@
+# Dockerfile.tailscale
+FROM ubuntu:24.04
+
+# تحديث النظام وتثبيت الأدوات الأساسية
+RUN apt-get update && apt-get install -y \
+    curl \
+    gnupg \
+    lsb-release \
+    iproute2 \
+    iptables \
+    sudo \
+    python3 \
+    python3-pip \
+    jq \
+    && apt-get clean
+
+# تثبيت Tailscale الرسمي
+RUN curl -fsSL https://tailscale.com/install.sh | sh
+
+# تشغيل دائم للحاوية
+CMD ["sleep", "infinity"]
