@@ -9,17 +9,13 @@ echo "🚀 Creating ${VM_NAME}..."
 
 docker rm -f "${VM_NAME}" >/dev/null 2>&1 || true
 
-# إنشاء container Ubuntu مع XFCE و xRDP
-docker run -d --name "${VM_NAME}" --hostname "${VM_NAME}" --network host \
-  ubuntu:22.04 sleep infinity
+# استخدام الصورة المبنية مسبقًا
+docker run -d --name "${VM_NAME}" --hostname "${VM_NAME}" --network host rdp-ubuntu:latest
 
-echo "🛠 Installing desktop and RDP inside ${VM_NAME}..."
-docker exec -i "${VM_NAME}" bash -c "apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y xfce4 xfce4-goodies xrdp sudo python3 python3-pip curl jq && apt-get clean"
-
-# تشغيل xrdp
+# تشغيل xrdp داخل container
 docker exec -d "${VM_NAME}" bash -c "service dbus start || true; service xrdp start || true"
 
-# استخراج IP host runner (Tailscale IP)
+# استخراج IP Tailscale من Runner مباشرة
 TS_IP=$(tailscale ip -4 | head -n1)
 
 echo "✅ ${VM_NAME} created. Runner Tailscale IP: ${TS_IP}"
