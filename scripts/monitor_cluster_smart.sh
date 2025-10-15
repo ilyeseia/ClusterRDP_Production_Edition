@@ -23,5 +23,5 @@ while true; do
     done
     echo "📊 Current Cluster Status:"
     [ -f "${JSON_FILE}" ] && jq . "${JSON_FILE}" || true
-    sleep 300  # تحقق كل 5 دقائق
+    sleep 300
 done
