@@ -6,46 +6,43 @@ on:
 jobs:
   cluster-rdp-smart:
     runs-on: ubuntu-latest
-    timeout-minutes: 1440  # 24 ساعة
+    timeout-minutes: 1440
 
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    - name: Install prerequisites and Docker official
-      run: |
-        sudo apt update -qq
-        sudo apt install -y ca-certificates curl gnupg lsb-release jq python3 python3-pip
+      - name: Install prerequisites
+        run: |
+          sudo apt update -qq
+          sudo apt install -y jq docker.io python3 python3-pip curl
 
-        # إضافة مفتاح Docker الرسمي
-        sudo mkdir -p /etc/apt/keyrings
-        curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+      - name: Install Tailscale on Runner
+        run: |
+          curl -fsSL https://tailscale.com/install.sh | sh
+          sudo tailscaled --state=/tmp/tailscaled.state &
+          sleep 5
+          sudo tailscale up --authkey="${{ secrets.TAILSCALE_AUTH_KEY }}" --hostname="runner" --accept-dns=false
 
-        # إضافة مستودع Docker الرسمي
-        echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+      - name: Ensure script permissions
+        run: chmod +x scripts/*.sh
 
-        # تثبيت Docker الرسمي
-        sudo apt update -qq
-        sudo apt install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+      - name: Launch Production Smart Cluster
+        env:
+          TAILSCALE_AUTH_KEY: ${{ secrets.TAILSCALE_AUTH_KEY }}
+          GMAIL_USER: ${{ secrets.GMAIL_USER }}
+          GMAIL_PASS: ${{ secrets.GMAIL_PASS }}
+        run: |
+          echo "⏱ Starting VM creation sequence (Production timings)..."
+          ./scripts/create_rdp_vm_smart.sh 1 &
+          sleep 7200
+          ./scripts/create_rdp_vm_smart.sh 2 &
+          sleep 7200
+          ./scripts/create_rdp_vm_smart.sh 3 &
+          echo "✅ All VMs launched in production sequence."
 
-    - name: Ensure script permissions
-      run: chmod +x scripts/*.sh
-
-    - name: Launch Production Smart Cluster
-      env:
-        TAILSCALE_AUTH_KEY: ${{ secrets.TAILSCALE_AUTH_KEY }}
-        GMAIL_USER: ${{ secrets.GMAIL_USER }}
-        GMAIL_PASS: ${{ secrets.GMAIL_PASS }}
-      run: |
-        echo "⏱ Starting VM creation sequence..."
-        ./scripts/create_rdp_vm_smart.sh 1 &
-        sleep 7200 && ./scripts/create_rdp_vm_smart.sh 2 &
-        sleep 7200 && ./scripts/create_rdp_vm_smart.sh 3 &
-        echo "✅ All VMs launched in production sequence."
-
-    - name: Monitor Cluster (long-running)
-      env:
-        TAILSCALE_AUTH_KEY: ${{ secrets.TAILSCALE_AUTH_KEY }}
-        GMAIL_USER: ${{ secrets.GMAIL_USER }}
-        GMAIL_PASS: ${{ secrets.GMAIL_PASS }}
-      run: ./scripts/monitor_cluster_smart.sh
+      - name: Monitor Cluster (long-running)
+        env:
+          GMAIL_USER: ${{ secrets.GMAIL_USER }}
+          GMAIL_PASS: ${{ secrets.GMAIL_PASS }}
+        run: ./scripts/monitor_cluster_smart.sh
