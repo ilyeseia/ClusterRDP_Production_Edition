@@ -7,40 +7,29 @@ JSON_FILE=".cluster_status_smart.json"
 
 echo "🚀 Creating ${VM_NAME}..."
 
-# إزالة أي حاوية قديمة بنفس الاسم
 docker rm -f "${VM_NAME}" >/dev/null 2>&1 || true
 
-# تشغيل الحاوية باستخدام صورة Tailscale الرسمية
-docker run -d --name "${VM_NAME}" --hostname "${VM_NAME}" \
-  --cap-add=NET_ADMIN --cap-add=SYS_MODULE \
-  tailscale/tailscale:stable sleep infinity
+# إنشاء container Ubuntu مع XFCE و xRDP
+docker run -d --name "${VM_NAME}" --hostname "${VM_NAME}" --network host \
+  ubuntu:22.04 sleep infinity
 
-echo "🛡️ Starting Tailscale inside ${VM_NAME}..."
-docker exec -d "${VM_NAME}" tailscaled --state=/tmp/tailscaled.state
+echo "🛠 Installing desktop and RDP inside ${VM_NAME}..."
+docker exec -i "${VM_NAME}" bash -c "apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y xfce4 xfce4-goodies xrdp sudo python3 python3-pip curl jq && apt-get clean"
 
-# Retry loop لتأكيد تشغيل tailscaled
-for i in {1..10}; do
-    if docker exec "${VM_NAME}" tailscale status >/dev/null 2>&1; then
-        echo "✅ tailscaled is running."
-        break
-    fi
-    echo "⏳ Waiting for tailscaled to start..."
-    sleep 3
-done
+# تشغيل xrdp
+docker exec -d "${VM_NAME}" bash -c "service dbus start || true; service xrdp start || true"
 
-docker exec "${VM_NAME}" tailscale up --authkey="${TAILSCALE_AUTH_KEY}" --hostname="${VM_NAME}" || true
+# استخراج IP host runner (Tailscale IP)
+TS_IP=$(tailscale ip -4 | head -n1)
 
-TS_IP=$(docker exec "${VM_NAME}" tailscale ip -4 | head -n1)
-echo "✅ ${VM_NAME} created with Tailscale IP: ${TS_IP}"
+echo "✅ ${VM_NAME} created. Runner Tailscale IP: ${TS_IP}"
 
 # تحديث JSON cluster status
-if [ ! -f "${JSON_FILE}" ]; then
-  echo "{}" > "${JSON_FILE}"
-fi
+if [ ! -f "${JSON_FILE}" ]; then echo "{}" > "${JSON_FILE}"; fi
 tmp=$(mktemp)
 jq --arg name "${VM_NAME}" --arg ip "${TS_IP}" '.[$name]=$ip' "${JSON_FILE}" > "${tmp}" && mv "${tmp}" "${JSON_FILE}" || echo "{}" > "${JSON_FILE}"
 
-# إرسال إشعار Gmail (اختياري)
+# إرسال إشعار Gmail
 if [ -n "${GMAIL_USER:-}" ] && [ -n "${GMAIL_PASS:-}" ]; then
 python3 - <<PYCODE || true
 import smtplib, ssl, os
