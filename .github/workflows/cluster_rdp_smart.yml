@@ -1,0 +1,43 @@
+name: ClusterRDP Smart (Production Edition)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  cluster-rdp-smart:
+    runs-on: ubuntu-latest
+    timeout-minutes: 1440  # allow up to 24 hours for long-run tasks
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install prerequisites
+        run: |
+          sudo apt update -qq
+          sudo apt install -y jq docker.io python3 python3-pip
+
+      - name: Ensure script permissions
+        run: chmod +x scripts/*.sh
+
+      - name: Launch Production Smart Cluster
+        env:
+          TAILSCALE_AUTH_KEY: ${{ secrets.TAILSCALE_AUTH_KEY }}
+          GMAIL_USER: ${{ secrets.GMAIL_USER }}
+          GMAIL_PASS: ${{ secrets.GMAIL_PASS }}
+        run: |
+          echo "⏱ Starting VM creation sequence (Production timings)..."
+          # Launch VM1 immediately, VM2 after 2 hours, VM3 after 4 hours
+          ./scripts/create_rdp_vm_smart.sh 1 &
+          sleep 7200
+          ./scripts/create_rdp_vm_smart.sh 2 &
+          sleep 7200
+          ./scripts/create_rdp_vm_smart.sh 3 &
+          echo "✅ All VMs launched in production sequence."
+
+      - name: Monitor Cluster (long-running)
+        env:
+          TAILSCALE_AUTH_KEY: ${{ secrets.TAILSCALE_AUTH_KEY }}
+          GMAIL_USER: ${{ secrets.GMAIL_USER }}
+          GMAIL_PASS: ${{ secrets.GMAIL_PASS }}
+        run: ./scripts/monitor_cluster_smart.sh
