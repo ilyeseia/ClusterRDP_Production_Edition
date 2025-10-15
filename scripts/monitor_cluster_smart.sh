@@ -15,7 +15,7 @@ while true; do
             ./scripts/create_rdp_vm_smart.sh "${i}"
         else
             echo "✅ ${VM_NAME} is running."
-            TS_IP=$(docker exec "${VM_NAME}" tailscale ip -4 2>/dev/null | grep '^100\.' | head -n1 || true)
+            TS_IP=$(tailscale ip -4 | head -n1)
             if [ ! -f "${JSON_FILE}" ]; then echo "{}" > "${JSON_FILE}"; fi
             tmp=$(mktemp)
             jq --arg name "${VM_NAME}" --arg ip "${TS_IP}" '.[$name]=$ip' "${JSON_FILE}" > "${tmp}" && mv "${tmp}" "${JSON_FILE}" || true
