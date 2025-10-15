@@ -17,8 +17,18 @@ docker run -d --name "${VM_NAME}" --hostname "${VM_NAME}" \
 
 echo "🛡️ Starting Tailscale inside ${VM_NAME}..."
 docker exec -d "${VM_NAME}" tailscaled --state=/tmp/tailscaled.state
-sleep 5
-docker exec "${VM_NAME}" tailscale up --authkey="${TAILSCALE_AUTH_KEY}" --hostname="${VM_NAME}"
+
+# Retry loop لتأكيد تشغيل tailscaled
+for i in {1..10}; do
+    if docker exec "${VM_NAME}" tailscale status >/dev/null 2>&1; then
+        echo "✅ tailscaled is running."
+        break
+    fi
+    echo "⏳ Waiting for tailscaled to start..."
+    sleep 3
+done
+
+docker exec "${VM_NAME}" tailscale up --authkey="${TAILSCALE_AUTH_KEY}" --hostname="${VM_NAME}" || true
 
 TS_IP=$(docker exec "${VM_NAME}" tailscale ip -4 | head -n1)
 echo "✅ ${VM_NAME} created with Tailscale IP: ${TS_IP}"
